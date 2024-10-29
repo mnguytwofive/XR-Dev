@@ -6,19 +6,19 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/StartMenu.unity
-    guid: 495d91d04c3d8f744b26612d3495cd29
-  - enabled: 1
+    path: Assets/Scenes/MenuScenes/StartMenu.unity
+    guid: bbcb42f5ec5e66f4ea8e071fe533ba0f
+  - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 55daccc09a3b69647bbab145b54a3ab3
   - enabled: 1
-    path: Assets/MainMenu.unity
+    path: Assets/Scenes/MenuScenes/MainMenu.unity
     guid: becdf87d658444b908cf98fb177fe292
   - enabled: 1
-    path: Assets/InteractiveSelectionSort.unity
+    path: Assets/Scenes/SortingAlgoScenes/UserTasks/InteractiveSelectionSort.unity
     guid: b14e5e0f752494c68a744d62c5a5bcdf
   - enabled: 1
-    path: Assets/SelectionSortDemo.unity
+    path: Assets/Scenes/SortingAlgoScenes/Demo/SelectionSortDemo.unity
     guid: 90b9e5ec7e0c043bca391b039a01d7e4
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: bfa1182bd221b4ca89619141f66f1260, type: 2}
