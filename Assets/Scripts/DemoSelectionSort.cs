@@ -32,6 +32,10 @@ public class DemoSelectionSort : MonoBehaviour
     //Sort Alphabetically 
     public Button SortAlphabetically;
     public bool startSortingAlphabetically = false;
+
+    public Button Reset; 
+    public bool resetButtonNotAvailable = true; 
+
     
     //User input
     public TMP_InputField InputUserList;
@@ -66,22 +70,30 @@ public class DemoSelectionSort : MonoBehaviour
     bool check_If_Curr_Is_Min = false;
 
     //threshold value:
-    public float THRESHOLD = 0.2f;
+    public float THRESHOLD = 0.15f; //was at 0.2f
 
 
     //we must save the minimum index 
     public int minIndexToSave = 0;
    
    //speed of the blocks
-    public float speed = 10.0f;
+    public float speed = 10.0f; //was at 10.0f
 
     int min = 0;
     int minIndex = 0;
+
+    // for arrow checks
+    public float moveInterval = 0.5f; // Time in seconds between each movement
+    public float timer = 0f;
+    public bool arrowCheckCycle = true; 
+    public int dynamicArrowCheckIndex = 0; 
+    public bool goForward = true; 
+
     
 
     // Start is called before the first frame update
     void Start()
-    {
+    { 
         
         // Add an OnClick listener to the button
         SortLeastGreatest.onClick.AddListener(StartAutoSortingLeastGreatest);
@@ -91,6 +103,11 @@ public class DemoSelectionSort : MonoBehaviour
 
         // Add an OnClick listener to the button
         SortAlphabetically.onClick.AddListener(StartAutoSortingAlphabetically);
+
+        moveResetButtonUp(); 
+
+        // Add an OnClick listener to the button
+        Reset.onClick.AddListener(ResetEnvironment);
 
         if (InputUserList == null)
         {
@@ -113,427 +130,498 @@ public class DemoSelectionSort : MonoBehaviour
     void Update()
     {
 
-
-        if (userListEntered) //if the list has been entered then we go in here 
-        {
-
-            if (listNotProcessed) //if the list has not been processed yet then we must process it 
+        if(resetButtonNotAvailable)
+        {    
+            if (userListEntered) //if the list has been entered then we go in here 
             {
-                if(ProcessInput()) //process the list 
-                { //if have a successfull process of list 
-                    //move the list up (to make it "disapear)
-                    Vector3 currentInputListPosition = InputUserList.transform.position;
-                    currentInputListPosition.y += 300; // Increase the y position by 300
-                    InputUserList.transform.position = currentInputListPosition; // Assign the new position
 
-                    //create a new current position arrow 
-                    CreateArrowAtPosition(getCurrPosition(rect_Num_In_List));
-                    Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
-                    currentArrowPos.y += 5;
-                    runtime_currentPositionArrow.transform.position = currentArrowPos; //I want the arrow above the rectangle 
-
-                    validList = true;
-                    listNotProcessed = false;
-                }
-                else
-                { //make the user insert a valid list 
-                    userListEntered = false;
-
-                }
-
-            }
-            else if (startSortingLeastGreatest || startSortingGreatestLeast || startSortingAlphabetically)  // when the user presses auto sort we go in here and start sorting the list 
-            {
-                if (currentListPosition < rect_Num_In_List.Count) //we dont want to go out of bounds
+                if (listNotProcessed) //if the list has not been processed yet then we must process it 
                 {
 
-            
-                    GameObject rect = cubesList[currentListPosition]; //get the rectangle in the current position
+                    if(ProcessInput()) //process the list 
+                    { //if have a successfull process of list 
+                        //move the list up (to make it "disapear)
+                        Vector3 currentInputListPosition = InputUserList.transform.position;
+                        currentInputListPosition.y += 300; // Increase the y position by 300
+                        InputUserList.transform.position = currentInputListPosition; // Assign the new position
 
-                    Vector3 arrowPointPosition = rect.transform.position; //get the rectangles position
+                        //create a new current position arrow 
+                        CreateArrowAtPosition(getCurrPosition(rect_Num_In_List));
+                        Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
+                        currentArrowPos.y += 5;
+                        runtime_currentPositionArrow.transform.position = currentArrowPos; //I want the arrow above the rectangle 
 
-                    min = rect_Num_In_List[currentListPosition]; //get the minimum value
-                    minIndex = currentListPosition; // get the minimum index 
-
-                    int minimum_Val_Index = currentListPosition;
-                    int minimum_Val_Check = rect_Num_In_List[currentListPosition];
-
-                    if (startSortingLeastGreatest || startSortingAlphabetically) //if we are sorting from least to greatest 
-                    {
-                        /* I want to find the smallest number in the list to see if its the current postion arrow */
-                        for (int i = currentListPosition; i < rect_Num_In_List.Count; i++)
-                        {
-                            if (minimum_Val_Check > rect_Num_In_List[i])
-                            {
-                                minimum_Val_Index = i;
-                            }
-                        }
-
-                        if (minimum_Val_Index == currentListPosition) //if nothing has changed then currentListPosition index is the smallest value in list
-                        {
-                            check_If_Curr_Is_Min = true;
-                        }
+                        validList = true;
+                        listNotProcessed = false;
                     }
-                    else if (startSortingGreatestLeast) //if we are sorting from greatest to least 
-                    {
-                        /* I want to find the greatest number in the list to see if its the current postion arrow */
-                        for (int i = currentListPosition; i < rect_Num_In_List.Count; i++)
-                        {
-                            if (minimum_Val_Check < rect_Num_In_List[i])
-                            {
-                                minimum_Val_Index = i;
-                            }
-                        }
+                    else
+                    { //make the user insert a valid list 
+                        userListEntered = false;
 
-                        if (minimum_Val_Index == currentListPosition) //if nothing has changed then currentListPosition index is the smallest value in list
-                        {
-                            check_If_Curr_Is_Min = true;
-                        }
                     }
-                    
-                    /* STARTING INDEX MOVING TO THE TEMP SPOT */
-                    if(temp_position_Not_Reached) //we go in here unitl we have reached the temp spot 
+
+                }
+                else if (arrowCheckCycle)
+                {
+                    // Accumulate time
+                    timer += Time.deltaTime;
+                    Vector3 posToGet; 
+
+                    int minIndex = returnSmallestOrGreatestIndex(rect_Num_In_List, currentListPosition);
+
+
+                    // If the timer exceeds the interval, move the object
+                    if (timer >= moveInterval)
                     {
-                        
-                    
-                        if (Mathf.Abs(rect.transform.position.z - TempDistance) > THRESHOLD) //GOING FOWARD TOWARDS TEMP
-                        {
-                            // DEBUG INFO --------------------------------------------------------------------
-                            Debug.Log("curr min position going to temp: " + rect.transform.position.z);
-                            Debug.Log("temp: " + TempDistance);
-                            Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.z - TempDistance));
-                            Debug.Log("IN TEMP GOING FORWARD");
-                            // DEBUG INFO --------------------------------------------------------------------
 
-                            rect.transform.Translate(Vector3.forward * speed * Time.deltaTime); //move up (+ z-axis)
+                        if (dynamicArrowCheckIndex == rect_Num_In_List.Count - 1)
+                        {
+                            goForward = false; 
+                        }
+                        else if (goForward) //while we have not made it to the end 
+                        {
+                            posToGet = cubesList[dynamicArrowCheckIndex + 1].transform.position;
+                            posToGet.y += 5;
+                            runtime_currentPositionArrow.transform.position = posToGet; //I want the arrow above the rectangle 
+                            ++dynamicArrowCheckIndex; 
+                        }
+
+                        if (dynamicArrowCheckIndex == minIndex && !(goForward))
+                        {
+                            //update values 
+                            arrowCheckCycle = false; 
+                            goForward = true; //this is getting reset 
+                        }
+                        else if (!(goForward))
+                        {
+                            posToGet = cubesList[dynamicArrowCheckIndex - 1].transform.position; //get the position behind 
+                            posToGet.y += 5;
+                            runtime_currentPositionArrow.transform.position = posToGet; //I want the arrow above the rectangle 
+                            --dynamicArrowCheckIndex; 
 
                         }
-                        else if (Mathf.Abs(rect.transform.position.x - middleX) > THRESHOLD) //CHECK TO GO LEFT (+ result) OR RIGHT (- result)
-                        {
-                            if (rect.transform.position.x > middleX) //GOING LEFT TOWARDS TEMP
-                            {   
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("curr min position going to temp (left): " + rect.transform.position.x);
-                                Debug.Log("middleX: " + middleX);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - middleX));
-                                Debug.Log("IN TEMP GOING LEFT");
-                                // DEBUG INFO --------------------------------------------------------------------
 
-                                rect.transform.Translate(Vector3.left  * speed * Time.deltaTime); //move left (- x-axis)
-                            }
-                            else //GOING RIGHT TOWARDS TEMP
-                            {   
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("curr min position going to temp (right): " + rect.transform.position.x);
-                                Debug.Log("middleX: " + middleX);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - middleX));
-                                Debug.Log("IN TEMP GOING RIGHT");
-                                // DEBUG INFO --------------------------------------------------------------------
-
-                                rect.transform.Translate(Vector3.right  * speed *  Time.deltaTime); //move right (+ x-axis)
-                            }
-                        }
-                        /* check if we can move on to moving the smallest value in current list postion */
-                        if (Mathf.Abs(rect.transform.position.x - middleX) <= THRESHOLD && Mathf.Abs(rect.transform.position.z - TempDistance) <= THRESHOLD)
-                        {
-                            temp_position_Not_Reached = false;
-                    
-                        }
+                        // Reset the timer
+                        timer = 0f;
                     }
-                    else if (check_If_Curr_Is_Min) //if the current list postion is the  smallest value I want to move it to temp and then right back where it was 
+                }
+                else if (startSortingLeastGreatest || startSortingGreatestLeast || startSortingAlphabetically)  // when the user presses auto sort we go in here and start sorting the list 
+                {
+                    if (currentListPosition < rect_Num_In_List.Count) //we dont want to go out of bounds
                     {
-                        
-                        
-                        Vector3 minIndexPreviousPosition = getCurrPosition(rect_Num_In_List); //safely get curr position 
 
-                        if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) > THRESHOLD) //move rect in temp to its original location 
+                
+                        GameObject rect = cubesList[currentListPosition]; //get the rectangle in the current position
+
+                        Vector3 arrowPointPosition = rect.transform.position; //get the rectangles position
+
+                        min = rect_Num_In_List[currentListPosition]; //get the minimum value
+                        minIndex = currentListPosition; // get the minimum index 
+
+                        int minimum_Val_Index = currentListPosition;
+                        int minimum_Val_Check = rect_Num_In_List[currentListPosition];
+
+                        if (startSortingLeastGreatest || startSortingAlphabetically) //if we are sorting from least to greatest 
                         {
-                            if (minIndexPreviousPosition.x > rect.transform.position.x) //if arrow's current postion is to the left of us  { location .  < . temp (rect.transform) . < . location }
+                            /* I want to find the smallest number in the list to see if its the current postion arrow */
+                            for (int i = currentListPosition; i < rect_Num_In_List.Count; i++)
                             {
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("curr min position from temp to its original position (moving right): " + rect.transform.position.x);
-                                Debug.Log("previous pos: " + minIndexPreviousPosition.x);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
-                                Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING RIGHT BACK TO ORIGINAL POSITION FROM TEMP");
-                                // DEBUG INFO --------------------------------------------------------------------
-
-                                rect.transform.Translate(Vector3.right  * speed * Time.deltaTime); //move right (+ x-axis)
+                                if (minimum_Val_Check > rect_Num_In_List[i])
+                                {
+                                    minimum_Val_Index = i;
+                                }
                             }
-                            else
-                            {
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("curr min position from temp to its original position (moving left): " + rect.transform.position.x);
-                                Debug.Log("previous pos: " + minIndexPreviousPosition.x);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
-                                Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING LEFT BACK TO ORIGINAL POSITION FROM TEMP");
-                                // DEBUG INFO --------------------------------------------------------------------
 
-                                rect.transform.Translate(Vector3.left  * speed *  Time.deltaTime); //move left (- x-axis) 
+                            if (minimum_Val_Index == currentListPosition) //if nothing has changed then currentListPosition index is the smallest value in list
+                            {
+                                check_If_Curr_Is_Min = true;
                             }
                         }
-                        else if (Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) > THRESHOLD)
+                        else if (startSortingGreatestLeast) //if we are sorting from greatest to least 
                         {
-                            // DEBUG INFO --------------------------------------------------------------------
-                            Debug.Log("curr min position from temp to its original position going down: " + rect.transform.position.z);
-                            Debug.Log("previous pos z: " + minIndexPreviousPosition.z);
-                            Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z));
-                            Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING DOWN");
-                            // DEBUG INFO --------------------------------------------------------------------
-
-                            rect.transform.Translate(Vector3.back * speed * Time.deltaTime); //move down (- z-axis)
-                        }
-
-                        
-
-                        //check if the cycle has been complete 
-                        if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) <= THRESHOLD && Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) <= THRESHOLD)
-                        {
-                            //we want to reset the cycle 
-                            current_List_Position_Not_Reached = true;
-                            temp_position_Not_Reached = true;
-                            check_If_Curr_Is_Min = false;
-                            currentListPosition++;
-
-                            if (currentListPosition != rect_Num_In_List.Count) //we dont want to go in here when we are at the end of the list 
+                            /* I want to find the greatest number in the list to see if its the current postion arrow */
+                            for (int i = currentListPosition; i < rect_Num_In_List.Count; i++)
                             {
-                                //update the arrow position 
-                                UpdateArrowPosition(getCurrPosition(rect_Num_In_List));
-
-                                //I want the arrow above the rectangle  
-                                Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
-                                currentArrowPos.y += 5;
-                                runtime_currentPositionArrow.transform.position = currentArrowPos; 
+                                if (minimum_Val_Check < rect_Num_In_List[i])
+                                {
+                                    minimum_Val_Index = i;
+                                }
                             }
+
+                            if (minimum_Val_Index == currentListPosition) //if nothing has changed then currentListPosition index is the smallest value in list
+                            {
+                                check_If_Curr_Is_Min = true;
+                            }
+                        }
+                        
+                        /* STARTING INDEX MOVING TO THE TEMP SPOT */
+                        if(temp_position_Not_Reached) //we go in here unitl we have reached the temp spot 
+                        {
                             
-                            //WHEN THE LIST HAS BEEN COMPLETELY SORTED WE GO IN HERE 
-                            if (currentListPosition == rect_Num_In_List.Count) //if the list has been completely sorted 
-                            {
-                                //reset these for the next list the usŅr wants to enter 
-                                userListEntered = false;
-                                listNotProcessed = true;
-                                startSortingLeastGreatest = false;
-                                startSortingGreatestLeast = false;
-                                startSortingAlphabetically = false;
-                                validList = false;
-                                currentListPosition = 0;
-                                distanceBetweenRectangles = 0; //reset this again so the cubes are spaced out correctly 
-
-                                foreach (GameObject cube in cubesList) //get rid of every cube in the scene
-                                {
-                                    Destroy(cube); // Destroy the GameObject in the scene
-                                }
-
-                                Destroy(runtime_currentPositionArrow); //destory the arrow 
-
-
-                                //clear both lists
-                                cubesList.Clear();
-                                rect_Num_In_List.Clear();
-
-                                
-                                InputUserList.text = ""; // Clear the input field
-
-                                /*make the input list visible again  */
-                                Vector3 currentInputListPosition = InputUserList.transform.position;
-                                currentInputListPosition.y -= 300; // Increase the y position by 300
-                                InputUserList.transform.position = currentInputListPosition; // Assign the new position
-
-                                moveButtonsDown(); //bring the buttons back down 
-                            }
-            
-
-                        }
-                      
-
                         
-                    }
-                    else 
-                    {
-                    /* MINIMUM INDEX HEADS TOWARD THE CURRENT POSITION IN THIS IF STATEMENT BELOW */
-                        if (current_List_Position_Not_Reached)
+                            if (Mathf.Abs(rect.transform.position.z - TempDistance) > THRESHOLD) //GOING FOWARD TOWARDS TEMP
+                            {
+                                // DEBUG INFO --------------------------------------------------------------------
+                                Debug.Log("curr min position going to temp: " + rect.transform.position.z);
+                                Debug.Log("temp: " + TempDistance);
+                                Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.z - TempDistance));
+                                Debug.Log("IN TEMP GOING FORWARD");
+                                // DEBUG INFO --------------------------------------------------------------------
+
+                                rect.transform.Translate(Vector3.forward * speed * Time.deltaTime); //move up (+ z-axis)
+
+                            }
+                            else if (Mathf.Abs(rect.transform.position.x - middleX) > THRESHOLD) //CHECK TO GO LEFT (+ result) OR RIGHT (- result)
+                            {
+                                if (rect.transform.position.x > middleX) //GOING LEFT TOWARDS TEMP
+                                {   
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log("curr min position going to temp (left): " + rect.transform.position.x);
+                                    Debug.Log("middleX: " + middleX);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - middleX));
+                                    Debug.Log("IN TEMP GOING LEFT");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    rect.transform.Translate(Vector3.left  * speed * Time.deltaTime); //move left (- x-axis)
+                                }
+                                else //GOING RIGHT TOWARDS TEMP
+                                {   
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log("curr min position going to temp (right): " + rect.transform.position.x);
+                                    Debug.Log("middleX: " + middleX);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - middleX));
+                                    Debug.Log("IN TEMP GOING RIGHT");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    rect.transform.Translate(Vector3.right  * speed *  Time.deltaTime); //move right (+ x-axis)
+                                }
+                            }
+                            /* check if we can move on to moving the smallest value in current list postion */
+                            if (Mathf.Abs(rect.transform.position.x - middleX) <= THRESHOLD && Mathf.Abs(rect.transform.position.z - TempDistance) <= THRESHOLD)
+                            {
+                                temp_position_Not_Reached = false;
+                        
+                            }
+                        }
+                        else if (check_If_Curr_Is_Min) //if the current list postion is the  smallest value I want to move it to temp and then right back where it was 
                         {
+                            
+                            
+                            Vector3 minIndexPreviousPosition = getCurrPosition(rect_Num_In_List); //safely get curr position 
 
-                            if (startSortingLeastGreatest || startSortingAlphabetically) //if we are sorting from least to greatest go in here 
+                            if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) > THRESHOLD) //move rect in temp to its original location 
                             {
-                                
-                                for (int i = currentListPosition + 1; i < rect_Num_In_List.Count; i++)
-                                {
-                                
-                                    if (min > rect_Num_In_List[i])
-                                    {
-                                        min = rect_Num_In_List[i];
-                                        minIndex = i;
-                                    }
-
-                                } //when we exit this for loop we should have the min value
-
-                            }
-                            else if (startSortingGreatestLeast) //if we are sorting from greatest to least go in here
-                            {
-                                for (int i = currentListPosition + 1; i < rect_Num_In_List.Count; i++)
-                                { //substitute min for max 
-                                
-                                    if (min < rect_Num_In_List[i]) // if (max < rect_Num_In_List[i])
-                                    {
-                                        min = rect_Num_In_List[i]; //max = rect_Num_In_List[i]
-                                        minIndex = i; //maxIndex = i
-                                    }
-
-                                } //when we exit this for loop we should have the max value
-                            }
-
-                        Vector3 currPosVector = getCurrPosition(rect_Num_In_List);
-                        
-
-                            if ((Mathf.Abs(cubesList[minIndex].transform.position.z + TempDistance) > THRESHOLD) && phase_Not_Complete) //move away from the line 
-                            {
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("(move away from line:) cube min index z position: " + cubesList[minIndex].transform.position.z);
-                                Debug.Log("(move away from line:) temp distance: " + TempDistance);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.z + TempDistance));
-                                Debug.Log("IN CUBE GOING BACK TO CURRENT POSTION AND GOING AWAY");
-                                // DEBUG INFO --------------------------------------------------------------------
-
-                                cubesList[minIndex].transform.Translate(Vector3.back * speed *  Time.deltaTime); //move down (- z-axis)
-                                
-                            }
-                            else if (Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x) > THRESHOLD)
-                            {
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log(" cube min index x position: " + cubesList[minIndex].transform.position.x);
-                                Debug.Log("current position index x position: " + currPosVector.x);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x));
-                                Debug.Log("IN CUBE GOING BACK TO CURRENT POSTION (LEFT)");
-                                // DEBUG INFO --------------------------------------------------------------------
-
-                                cubesList[minIndex].transform.Translate(Vector3.left  * speed * Time.deltaTime); //move left (- x-axis)
-                                phase_Not_Complete = false;
-                                
-                            }
-                            else if (Mathf.Abs(cubesList[minIndex].transform.position.z - currPosVector.z) > THRESHOLD) //move up toward currListPosition ( + z-axis)
-                            {
-                                // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("cube min index z position: " + cubesList[minIndex].transform.position.z);
-                                Debug.Log("current position index z position: " + currPosVector.z);
-                                Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.z - currPosVector.z));
-                                Debug.Log("IN CUBE GOING UP TO CURRENT POSTION");
-                                // DEBUG INFO --------------------------------------------------------------------
-
-                                cubesList[minIndex].transform.Translate(Vector3.forward  * speed * Time.deltaTime);
-
-                            }
-
-                            //check each criteria 
-                            bool condition2 = Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x) <= THRESHOLD;
-                            bool condition3 = Mathf.Abs(cubesList[minIndex].transform.position.z - (arrowPointPosition.z - TempDistance)) <= THRESHOLD;
-
-
-                            if (condition2 && condition3) //if both conditions are meet the minimum value has taken the place of current position 
-                            {
-                                current_List_Position_Not_Reached = false; //we do not want to be here anymore 
-                                phase_Not_Complete = true; //reset this for the next cycle
-                                minIndexToSave = minIndex; //we want to save the minimum index for the next part 
-                            }
-                        }
-                        else 
-                        { /* CURRENT POSITION HEADS TOWARD MINIMUM INDEX POSITION (BEFORE ITS SWAPPED LOCATION) */
-                        
-                            int minPosX = 0;
-                            int minPosY = 0;
-                            int minPosZ = 0; 
-
-                            /* the point of this is too find the position of where the minimum value was at */
-                            for (int i = 0; i < rect_Num_In_List.Count; i++)
-                            {
-                                if (i == minIndexToSave) //once we find current position we can get out
-                                {
-                                    i = rect_Num_In_List.Count;
-                                }
-                                else
-                                {
-                                    minPosX += 5; 
-                                }
-                            }
-
-                            Vector3 minIndexPreviousPosition = new Vector3(minPosX, minPosY, minPosZ); //position of minimum index 
-
-                            if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) > THRESHOLD) //move curr position in temp to where minimum value was previously at
-                            {
-                                if (minIndexPreviousPosition.x > rect.transform.position.x) //we move right if previous minimum location was to the right of curr pos in temp
+                                if (minIndexPreviousPosition.x > rect.transform.position.x) //if arrow's current postion is to the left of us  { location .  < . temp (rect.transform) . < . location }
                                 {
                                     // DEBUG INFO --------------------------------------------------------------------
-                                    Debug.Log("Cur going to min pos x (moving right): " + rect.transform.position.x);
-                                    Debug.Log("min previous position x: " + minIndexPreviousPosition.x);
+                                    Debug.Log("curr min position from temp to its original position (moving right): " + rect.transform.position.x);
+                                    Debug.Log("previous pos: " + minIndexPreviousPosition.x);
                                     Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
-                                    Debug.Log("IN TEMP GOING TO MIN POS RIGHT");
+                                    Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING RIGHT BACK TO ORIGINAL POSITION FROM TEMP");
                                     // DEBUG INFO --------------------------------------------------------------------
 
                                     rect.transform.Translate(Vector3.right  * speed * Time.deltaTime); //move right (+ x-axis)
                                 }
-                                else //we move left if previous minimum location was to the left of curr pos in temp
+                                else
                                 {
                                     // DEBUG INFO --------------------------------------------------------------------
-                                    Debug.Log("Cur going to min pos x (moving left): " + rect.transform.position.x);
-                                    Debug.Log("min previous position x: " + minIndexPreviousPosition.x);
+                                    Debug.Log("curr min position from temp to its original position (moving left): " + rect.transform.position.x);
+                                    Debug.Log("previous pos: " + minIndexPreviousPosition.x);
                                     Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
-                                    Debug.Log("IN TEMP GOING TO MIN POS LEFT");
+                                    Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING LEFT BACK TO ORIGINAL POSITION FROM TEMP");
                                     // DEBUG INFO --------------------------------------------------------------------
 
-                                    rect.transform.Translate(Vector3.left  * speed *  Time.deltaTime); //move left (- x-axis)
+                                    rect.transform.Translate(Vector3.left  * speed *  Time.deltaTime); //move left (- x-axis) 
                                 }
                             }
-                            else if (Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) > THRESHOLD) //move back up 
+                            else if (Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) > THRESHOLD)
                             {
                                 // DEBUG INFO --------------------------------------------------------------------
-                                Debug.Log("Cur going to min pos z (moving up): " + rect.transform.position.z);
-                                Debug.Log("min previous position z: " + minIndexPreviousPosition.z);
+                                Debug.Log("curr min position from temp to its original position going down: " + rect.transform.position.z);
+                                Debug.Log("previous pos z: " + minIndexPreviousPosition.z);
                                 Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z));
-                                Debug.Log("IN TEMP GOING TO MIN POS DOWN");
+                                Debug.Log("IN CHECK_IF_CURR_IS_MIN GOING DOWN");
                                 // DEBUG INFO --------------------------------------------------------------------
 
                                 rect.transform.Translate(Vector3.back * speed * Time.deltaTime); //move down (- z-axis)
                             }
 
+                            
+
                             //check if the cycle has been complete 
                             if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) <= THRESHOLD && Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) <= THRESHOLD)
                             {
-                                temp_position_Not_Reached = true;
+                                //we want to reset the cycle 
                                 current_List_Position_Not_Reached = true;
-
-                                //need to update list with numbers that have been swaped 
-                                int temp = rect_Num_In_List[currentListPosition];
-                                rect_Num_In_List[currentListPosition] = rect_Num_In_List[minIndexToSave]; 
-                                rect_Num_In_List[minIndexToSave] = temp;
-
-                                //need to swap tempRect objects 
-                                GameObject tempRect = cubesList[currentListPosition];
-                                cubesList[currentListPosition] = cubesList[minIndexToSave];
-                                cubesList[minIndexToSave] = tempRect;
-
-
+                                temp_position_Not_Reached = true;
+                                check_If_Curr_Is_Min = false;
+                                arrowCheckCycle = true; 
 
                                 currentListPosition++;
+                                dynamicArrowCheckIndex = currentListPosition; 
 
-                                //update the arrow position 
-                                UpdateArrowPosition(getCurrPosition(rect_Num_In_List));
+                                if (currentListPosition != rect_Num_In_List.Count) //we dont want to go in here when we are at the end of the list 
+                                {
+                                    //update the arrow position 
+                                    UpdateArrowPosition(getCurrPosition(rect_Num_In_List));
 
-                                //I want the arrow above the rectangle  
-                                Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
-                                currentArrowPos.y += 5;
-                                runtime_currentPositionArrow.transform.position = currentArrowPos; 
+                                    //I want the arrow above the rectangle  
+                                    Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
+                                    currentArrowPos.y += 5;
+                                    runtime_currentPositionArrow.transform.position = currentArrowPos; 
+                                }
                                 
+                                //WHEN THE LIST HAS BEEN COMPLETELY SORTED WE GO IN HERE 
+                                if (currentListPosition == rect_Num_In_List.Count) //if the list has been completely sorted 
+                                {
+                                    //reset these for the next list the usŅr wants to enter 
+                                    userListEntered = false;
+                                    listNotProcessed = true;
+                                    startSortingLeastGreatest = false;
+                                    startSortingGreatestLeast = false;
+                                    startSortingAlphabetically = false;
+                                    validList = false;
+                                    currentListPosition = 0;
+                                    distanceBetweenRectangles = 0; //reset this again so the cubes are spaced out correctly 
+                                    arrowCheckCycle = true; 
+                                    dynamicArrowCheckIndex = 0; 
+
+                                    resetButtonNotAvailable = false;
+                                    moveResetButtonDown(); // move the reset button down 
+                                    
+                                }
+                
 
                             }
+                        
 
-
+                            
                         }
-                    }
-                
+                        else 
+                        {
+                        /* MINIMUM INDEX HEADS TOWARD THE CURRENT POSITION IN THIS IF STATEMENT BELOW */
+                            if (current_List_Position_Not_Reached)
+                            {
 
-                
+                                if (startSortingLeastGreatest || startSortingAlphabetically) //if we are sorting from least to greatest go in here 
+                                {
+                                    
+                                    for (int i = currentListPosition + 1; i < rect_Num_In_List.Count; i++)
+                                    {
+                                    
+                                        if (min > rect_Num_In_List[i])
+                                        {
+                                            min = rect_Num_In_List[i];
+                                            minIndex = i;
+                                        }
+
+                                    } //when we exit this for loop we should have the min value
+
+                                }
+                                else if (startSortingGreatestLeast) //if we are sorting from greatest to least go in here
+                                {
+                                    for (int i = currentListPosition + 1; i < rect_Num_In_List.Count; i++)
+                                    { //substitute min for max 
+                                    
+                                        if (min < rect_Num_In_List[i]) // if (max < rect_Num_In_List[i])
+                                        {
+                                            min = rect_Num_In_List[i]; //max = rect_Num_In_List[i]
+                                            minIndex = i; //maxIndex = i
+                                        }
+
+                                    } //when we exit this for loop we should have the max value
+                                }
+
+                            Vector3 currPosVector = getCurrPosition(rect_Num_In_List);
+                            
+
+                                if ((Mathf.Abs(cubesList[minIndex].transform.position.z + TempDistance) > THRESHOLD) && phase_Not_Complete) //move away from the line 
+                                {
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log("(move away from line:) cube min index z position: " + cubesList[minIndex].transform.position.z);
+                                    Debug.Log("(move away from line:) temp distance: " + TempDistance);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.z + TempDistance));
+                                    Debug.Log("IN CUBE GOING BACK TO CURRENT POSTION AND GOING AWAY");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    cubesList[minIndex].transform.Translate(Vector3.back * speed *  Time.deltaTime); //move down (- z-axis)
+                                    
+                                }
+                                else if (Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x) > THRESHOLD)
+                                {
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log(" cube min index x position: " + cubesList[minIndex].transform.position.x);
+                                    Debug.Log("current position index x position: " + currPosVector.x);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x));
+                                    Debug.Log("IN CUBE GOING BACK TO CURRENT POSTION (LEFT)");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    cubesList[minIndex].transform.Translate(Vector3.left  * speed * Time.deltaTime); //move left (- x-axis)
+                                    phase_Not_Complete = false;
+                                    
+                                }
+                                else if (Mathf.Abs(cubesList[minIndex].transform.position.z - currPosVector.z) > THRESHOLD) //move up toward currListPosition ( + z-axis)
+                                {
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log("cube min index z position: " + cubesList[minIndex].transform.position.z);
+                                    Debug.Log("current position index z position: " + currPosVector.z);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(cubesList[minIndex].transform.position.z - currPosVector.z));
+                                    Debug.Log("IN CUBE GOING UP TO CURRENT POSTION");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    cubesList[minIndex].transform.Translate(Vector3.forward  * speed * Time.deltaTime);
+
+                                }
+
+                                //check each criteria 
+                                bool condition2 = Mathf.Abs(cubesList[minIndex].transform.position.x - currPosVector.x) <= THRESHOLD;
+                                bool condition3 = Mathf.Abs(cubesList[minIndex].transform.position.z - (arrowPointPosition.z - TempDistance)) <= THRESHOLD;
+
+
+                                if (condition2 && condition3) //if both conditions are meet the minimum value has taken the place of current position 
+                                {
+                                    current_List_Position_Not_Reached = false; //we do not want to be here anymore 
+                                    phase_Not_Complete = true; //reset this for the next cycle
+                                    minIndexToSave = minIndex; //we want to save the minimum index for the next part 
+                                }
+                            }
+                            else 
+                            { /* CURRENT POSITION HEADS TOWARD MINIMUM INDEX POSITION (BEFORE ITS SWAPPED LOCATION) */
+                            
+                                int minPosX = 0;
+                                int minPosY = 0;
+                                int minPosZ = 0; 
+
+                                /* the point of this is too find the position of where the minimum value was at */
+                                for (int i = 0; i < rect_Num_In_List.Count; i++)
+                                {
+                                    if (i == minIndexToSave) //once we find current position we can get out
+                                    {
+                                        i = rect_Num_In_List.Count;
+                                    }
+                                    else
+                                    {
+                                        minPosX += 5; 
+                                    }
+                                }
+
+                                Vector3 minIndexPreviousPosition = new Vector3(minPosX, minPosY, minPosZ); //position of minimum index 
+
+                                if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) > THRESHOLD) //move curr position in temp to where minimum value was previously at
+                                {
+                                    if (minIndexPreviousPosition.x > rect.transform.position.x) //we move right if previous minimum location was to the right of curr pos in temp
+                                    {
+                                        // DEBUG INFO --------------------------------------------------------------------
+                                        Debug.Log("Cur going to min pos x (moving right): " + rect.transform.position.x);
+                                        Debug.Log("min previous position x: " + minIndexPreviousPosition.x);
+                                        Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
+                                        Debug.Log("IN TEMP GOING TO MIN POS RIGHT");
+                                        // DEBUG INFO --------------------------------------------------------------------
+
+                                        rect.transform.Translate(Vector3.right  * speed * Time.deltaTime); //move right (+ x-axis)
+                                    }
+                                    else //we move left if previous minimum location was to the left of curr pos in temp
+                                    {
+                                        // DEBUG INFO --------------------------------------------------------------------
+                                        Debug.Log("Cur going to min pos x (moving left): " + rect.transform.position.x);
+                                        Debug.Log("min previous position x: " + minIndexPreviousPosition.x);
+                                        Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x));
+                                        Debug.Log("IN TEMP GOING TO MIN POS LEFT");
+                                        // DEBUG INFO --------------------------------------------------------------------
+
+                                        rect.transform.Translate(Vector3.left  * speed *  Time.deltaTime); //move left (- x-axis)
+                                    }
+                                }
+                                else if (Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) > THRESHOLD) //move back up 
+                                {
+                                    // DEBUG INFO --------------------------------------------------------------------
+                                    Debug.Log("Cur going to min pos z (moving up): " + rect.transform.position.z);
+                                    Debug.Log("min previous position z: " + minIndexPreviousPosition.z);
+                                    Debug.Log("DIFFERENCE: " + Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z));
+                                    Debug.Log("IN TEMP GOING TO MIN POS DOWN");
+                                    // DEBUG INFO --------------------------------------------------------------------
+
+                                    rect.transform.Translate(Vector3.back * speed * Time.deltaTime); //move down (- z-axis)
+                                }
+
+                                //check if the cycle has been complete 
+                                if (Mathf.Abs(rect.transform.position.x - minIndexPreviousPosition.x) <= THRESHOLD && Mathf.Abs(rect.transform.position.z - minIndexPreviousPosition.z) <= THRESHOLD)
+                                {
+                                    temp_position_Not_Reached = true;
+                                    current_List_Position_Not_Reached = true;
+                                    arrowCheckCycle = true; 
+
+                                    //need to update list with numbers that have been swaped 
+                                    int temp = rect_Num_In_List[currentListPosition];
+                                    rect_Num_In_List[currentListPosition] = rect_Num_In_List[minIndexToSave]; 
+                                    rect_Num_In_List[minIndexToSave] = temp;
+
+                                    //need to swap tempRect objects 
+                                    GameObject tempRect = cubesList[currentListPosition];
+                                    cubesList[currentListPosition] = cubesList[minIndexToSave];
+                                    cubesList[minIndexToSave] = tempRect;
+
+
+
+                                    currentListPosition++;
+                                    dynamicArrowCheckIndex = currentListPosition;
+
+                                    //update the arrow position 
+                                    UpdateArrowPosition(getCurrPosition(rect_Num_In_List));
+
+                                    //I want the arrow above the rectangle  
+                                    Vector3 currentArrowPos = runtime_currentPositionArrow.transform.position;
+                                    currentArrowPos.y += 5;
+                                    runtime_currentPositionArrow.transform.position = currentArrowPos; 
+                                    
+
+                                }
+
+
+                            }
+                        }
+                    
+
+                    
+                    }
                 }
             }
         }
+    }
+
+    /* this helper method will get the smallest index from list */
+    public int returnSmallestOrGreatestIndex(List<int> rect_Num_In_List, int currentPosition)
+    {
+        int min = rect_Num_In_List[currentPosition];
+        int minIndex = currentPosition; 
+
+        if(startSortingLeastGreatest || startSortingAlphabetically)
+        {
+            for (int i = minIndex; i < rect_Num_In_List.Count; i++)
+            {
+                if (min > rect_Num_In_List[i])
+                {
+                    min = rect_Num_In_List[i];
+                    minIndex = i; 
+                }
+
+            }
+        }
+        else
+        {
+            for (int i = minIndex; i < rect_Num_In_List.Count; i++)
+            {
+                if (min < rect_Num_In_List[i])
+                {
+                    min = rect_Num_In_List[i];
+                    minIndex = i; 
+                }
+
+            }
+        }
+
+        return minIndex; 
+        
     }
 
 
@@ -570,6 +658,35 @@ public class DemoSelectionSort : MonoBehaviour
 
         
 
+    }
+
+    //when we click the button we reset the environment 
+    public void ResetEnvironment()
+    {
+        foreach (GameObject cube in cubesList) //get rid of every cube in the scene
+            {
+                Destroy(cube); // Destroy the GameObject in the scene
+            }
+
+            Destroy(runtime_currentPositionArrow); //destory the arrow 
+            
+
+            //clear both lists
+            cubesList.Clear();
+            rect_Num_In_List.Clear();
+
+            
+            InputUserList.text = ""; // Clear the input field
+
+            /*make the input list visible again  */
+            
+            Vector3 currentInputListPosition = InputUserList.transform.position;
+            currentInputListPosition.y -= 300; // Increase the y position by 300
+            InputUserList.transform.position = currentInputListPosition; // Assign the new position
+
+            resetButtonNotAvailable = true; 
+            moveButtonsDown(); //bring the buttons back down 
+            moveResetButtonUp(); // move the reset button out of sight immediatly 
     }
 
     //when we click the button we start sorting the list 
@@ -637,6 +754,24 @@ public class DemoSelectionSort : MonoBehaviour
 
     }
 
+    //helper method to move reset button down 
+    public void moveResetButtonDown()
+    {
+        //move the button up (to make it "disapear) so the user cannot click on it 
+        Vector3 currentPosition = Reset.transform.position;
+        currentPosition.y -= 600; // Increase the y position by 300
+        Reset.transform.position = currentPosition; // Assign the new position
+    }
+
+    //helper method to move reset button up 
+    public void moveResetButtonUp()
+    {
+        //move the button up (to make it "disapear) so the user cannot click on it 
+        Vector3 currentPosition = Reset.transform.position;
+        currentPosition.y += 600; // Increase the y position by 300
+        Reset.transform.position = currentPosition; // Assign the new position
+    }
+
     //when we enter the list we show the start button
     public void OnTextSubmitted(string userList)
     {
@@ -654,7 +789,7 @@ public class DemoSelectionSort : MonoBehaviour
         // Split the text into parts using ',' or space as a delimiter
         string[] numberStrings = inputText.Split(new char[] { ',', ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
 
-        if (numberStrings.Length <= 1) //we must have more than 1 element to sort in the list or something is wrong
+        if (numberStrings.Length < 1) //we must have more than 1 element to sort in the list or something is wrong
         {
             Debug.Log("Please enter a valid list ");
             return false; //something went wrong we must leave
